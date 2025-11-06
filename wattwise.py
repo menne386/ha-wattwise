@@ -108,7 +108,7 @@ class WattWise(hass.Hass):
         self.SENSOR_MAX_POSSIBLE_DISCHARGE = (
             "sensor.wattwise_maximum_discharge_possible"  # kW
         )
-        self.PRICE_FORECAST_SENSOR = "sensor.wattwise_tibber_prices"
+        self.PRICE_FORECAST_SENSOR = "sensor.energy_prices"
         self.SENSOR_FORECAST_HORIZON = "sensor.wattwise_forecast_horizon"  # hours
         self.SENSOR_HISTORY_HORIZON = "sensor.wattwise_history_horizon"  # hours
 
@@ -531,28 +531,20 @@ class WattWise(hass.Hass):
         self.price_forecast = []
 
         # Retrieve energy price forecast from Home Assistant entity
-        price_data_today = self.get_state(self.PRICE_FORECAST_SENSOR, attribute="today")
-        price_data_tomorrow = self.get_state(
-            self.PRICE_FORECAST_SENSOR, attribute="tomorrow"
-        )
-
+        price_data_today = self.get_state(self.PRICE_FORECAST_SENSOR, attribute="prices")
+        
         if not price_data_today:
-            self.error("Energy price forecast data for today is unavailable.")
+            self.error(f"Energy price forecast data for today is unavailable. {self.PRICE_FORECAST_SENSOR}")
             return
 
         now = get_now_time()
         current_hour = now.hour
+        
+        
 
         # Combine today's and tomorrow's data
-        combined_price_data = price_data_today
-
-        if price_data_tomorrow:
-            combined_price_data += price_data_tomorrow
-            self.log(
-                "Tomorrow's energy price data is available and included in the forecast."
-            )
-        else:
-            self.log("Tomorrow's energy price data is not available yet.")
+        combined_price_data = price_data_today['prices']
+        self.log(f"Combined_price: {combined_price_data}")
 
         # Create the price forecast for the next T hours
         price_forecast = []
@@ -560,11 +552,11 @@ class WattWise(hass.Hass):
             index = current_hour + t
             if index < len(combined_price_data):
                 price_entry = combined_price_data[index]
-                price = price_entry["total"] * 100  # Convert EUR/kWh to ct/kWh
+                price = price_entry["price"] * 100  # Convert EUR/kWh to ct/kWh
                 price_forecast.append(price)
             else:
                 # If we run out of data, use the last known price
-                price = combined_price_data[-1]["total"] * 100
+                price = combined_price_data[-1]["price"] * 100
                 self.log(
                     f"Price data for hour {index} not found. Using last known price."
                 )
@@ -1405,19 +1397,19 @@ class WattWise(hass.Hass):
 
             # Append data to forecasts
             forecasts[self.SENSOR_CHARGE_SOLAR].append(
-                [timestamp_iso, entry["charge_solar"]]
+                [timestamp_iso, entry["charge_solar"] or "0.0"]
             )
             forecasts[self.SENSOR_CHARGE_GRID].append(
-                [timestamp_iso, entry["charge_grid"]]
+                [timestamp_iso, entry["charge_grid"] or "0.0" ]
             )
-            forecasts[self.SENSOR_DISCHARGE].append([timestamp_iso, entry["discharge"]])
-            forecasts[self.SENSOR_GRID_EXPORT].append([timestamp_iso, entry["export"]])
+            forecasts[self.SENSOR_DISCHARGE].append([timestamp_iso, entry["discharge"] or "0.0"])
+            forecasts[self.SENSOR_GRID_EXPORT].append([timestamp_iso, entry["export"] or "0.0"])
             forecasts[self.SENSOR_GRID_IMPORT].append(
-                [timestamp_iso, entry["grid_import"]]
+                [timestamp_iso, entry["grid_import"] or "0.0" ]
             )
-            forecasts[self.SENSOR_SOC].append([timestamp_iso, entry["soc"]])
+            forecasts[self.SENSOR_SOC].append([timestamp_iso, entry["soc"] or "0.0"])
             forecasts[self.SENSOR_SOC_PERCENTAGE].append(
-                [timestamp_iso, soc_percentage]
+                [timestamp_iso, soc_percentage or "0.0"]
             )
             forecasts[self.BINARY_SENSOR_FULL_CHARGE_STATUS].append(
                 [timestamp_iso, "on" if full_charge_state else "off"]
