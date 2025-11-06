@@ -49,6 +49,7 @@ class WattWise(hass.Hass):
         self.DISCHARGE_RATE_MAX = float(self.args.get("discharge_rate_max", 6))  # kW
         self.TIME_HORIZON = int(self.args.get("time_horizon", 48))  # hours
         self.FEED_IN_TARIFF = float(self.args.get("feed_in_tariff", 7))  # ct/kWh
+        self.AVERAGE_DAY_CONSUMTION = float(self.args.get("average_day_consumption", 20)) # kWh
         self.CONSUMPTION_HISTORY_DAYS = int(
             self.args.get("consumption_history_days", 7)
         )  # days
@@ -1381,6 +1382,7 @@ class WattWise(hass.Hass):
         self.log("Forecast Arrays initialized.")
         self.log(f"Forecast for next {len(self.charging_schedule)} hours.")
         now = get_now_time()
+        localZero = "0.0"
 
         # Build the forecast data
         for t, entry in enumerate(self.charging_schedule):
@@ -1395,21 +1397,22 @@ class WattWise(hass.Hass):
             # Calculate SoC percentage
             soc_percentage = (entry["soc"] / self.BATTERY_CAPACITY) * 100
 
+
             # Append data to forecasts
             forecasts[self.SENSOR_CHARGE_SOLAR].append(
-                [timestamp_iso, entry["charge_solar"] or "0.0"]
+                [timestamp_iso, entry["charge_solar"] or localZero]
             )
             forecasts[self.SENSOR_CHARGE_GRID].append(
-                [timestamp_iso, entry["charge_grid"] or "0.0" ]
+                [timestamp_iso, entry["charge_grid"] or localZero ]
             )
-            forecasts[self.SENSOR_DISCHARGE].append([timestamp_iso, entry["discharge"] or "0.0"])
-            forecasts[self.SENSOR_GRID_EXPORT].append([timestamp_iso, entry["export"] or "0.0"])
+            forecasts[self.SENSOR_DISCHARGE].append([timestamp_iso, entry["discharge"] or localZero])
+            forecasts[self.SENSOR_GRID_EXPORT].append([timestamp_iso, entry["export"] or localZero])
             forecasts[self.SENSOR_GRID_IMPORT].append(
-                [timestamp_iso, entry["grid_import"] or "0.0" ]
+                [timestamp_iso, entry["grid_import"] or localZero ]
             )
-            forecasts[self.SENSOR_SOC].append([timestamp_iso, entry["soc"] or "0.0"])
+            forecasts[self.SENSOR_SOC].append([timestamp_iso, entry["soc"] or localZero])
             forecasts[self.SENSOR_SOC_PERCENTAGE].append(
-                [timestamp_iso, soc_percentage or "0.0"]
+                [timestamp_iso, soc_percentage or localZero]
             )
             forecasts[self.BINARY_SENSOR_FULL_CHARGE_STATUS].append(
                 [timestamp_iso, "on" if full_charge_state else "off"]
@@ -1421,14 +1424,14 @@ class WattWise(hass.Hass):
                 [timestamp_iso, "on" if desired_discharging else "off"]
             )
             forecasts[self.SENSOR_CONSUMPTION_FORECAST].append(
-                [timestamp_iso, self.consumption_forecast[t]]
+                [timestamp_iso, self.consumption_forecast[t] or localZero]
             )
             forecasts[self.SENSOR_SOLAR_PRODUCTION_FORECAST].append(
-                [timestamp_iso, self.solar_forecast[t]]
+                [timestamp_iso, self.solar_forecast[t] or localZero]
             )
             self.log(f'self.solar_forecast["{t}"]: "{self.solar_forecast[t]}')
             forecasts[self.SENSOR_MAX_POSSIBLE_DISCHARGE].append(
-                [timestamp_iso, self.max_discharge_possible[t]]
+                [timestamp_iso, self.max_discharge_possible[t] or localZero]
             )
             forecasts[self.BINARY_SENSOR_WITHIN_CHEAPEST_1_HOUR].append(
                 [timestamp_iso, "on" if self.within_cheapest_1_hour[t] else "off"]
@@ -1571,10 +1574,10 @@ class WattWise(hass.Hass):
         # Update the charge grid session sensor
         self.set_state(
             self.SENSOR_CHARGE_GRID_SESSION,
-            state=round(charge_grid_session, 3),
+            state=round(charge_grid_session, 3) or localZero,
             attributes={
-                "session_start": session_start.isoformat() if session_start else None,
-                "session_duration": session_duration,
+                "session_start": session_start.isoformat() if session_start else localZero,
+                "session_duration": session_duration or localZero,
             },
         )
         self.log(
